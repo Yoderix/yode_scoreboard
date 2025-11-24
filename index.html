@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<title>Scoreboard</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+:root{
+    --glass-bg: rgba(15,15,25,0.65);
+    --player-color: #4de54d; /* verde */
+    --police-color: #4d6df2; /* blu */
+    --ems-color: #f24d4d;    /* rosso */
+    --accent: #00f0ff;
+    --muted: rgba(255,255,255,0.08);
+}
+*{box-sizing:border-box}
+body{margin:0;padding:0;background:transparent;font-family:'Poppins',sans-serif;overflow:hidden;}
+
+#board{
+    position:absolute;
+    top:8%;
+    left:50%;
+    transform:translateX(-50%) translateY(-50px) scale(0.95);
+    width:680px;
+    max-width:95%;
+    background:var(--glass-bg);
+    backdrop-filter: blur(18px) saturate(140%);
+    color:#eafcff;
+    border-radius:20px;
+    padding:20px 28px;
+    box-shadow: 0 12px 42px rgba(0,0,0,0.7),0 0 36px rgba(0,240,255,0.08) inset;
+    opacity:0;
+    transition: all 0.5s cubic-bezier(.2,.9,.3,1);
+}
+#board.show{
+    opacity:1;
+    transform:translateX(-50%) translateY(0) scale(1);
+}
+
+.header{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    margin-bottom:14px;
+}
+.logo{
+    width:60px;
+    height:60px;
+    border-radius:14px;
+    background:linear-gradient(135deg,var(--accent),#0066ff);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow:0 8px 20px rgba(0,240,255,0.08);
+    font-size:24px;
+}
+.title{
+    font-size:28px;
+    text-shadow:0 0 16px rgba(0,240,255,0.14);
+    letter-spacing:0.7px;
+}
+.sub{
+    font-size:13px;
+    color:rgba(230,255,255,0.75);
+    margin-top:4px;
+}
+
+.stats{
+    display:flex;
+    gap:14px;
+    margin-top:12px;
+}
+.stat{
+    flex:1;
+    padding:12px;
+    border-radius:14px;
+    text-align:center;
+    font-size:16px;
+    font-weight:600;
+    color:#fff;
+    position:relative;
+    overflow:hidden;
+    transition: transform 0.25s, box-shadow 0.25s;
+}
+.stat:hover{
+    transform: translateY(-6px);
+    box-shadow:0 0 20px rgba(255,255,255,0.25);
+}
+.stat .num{
+    display:block;
+    margin-top:6px;
+    font-size:22px;
+    font-weight:700;
+    text-shadow:0 0 10px rgba(0,0,0,0.4);
+}
+
+#count{ color: var(--player-color);}
+#police{ color: var(--police-color);}
+#ems{ color: var(--ems-color);}
+
+#playerList{
+    margin-top:18px;
+    max-height:380px;
+    overflow:auto;
+    padding-right:6px;
+}
+
+.player{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:12px;
+    border-radius:12px;
+    background: rgba(255,255,255,0.02);
+    margin-bottom:10px;
+    opacity:0;
+    transform: translateX(-20px);
+    transition: all 0.4s ease-out;
+    font-size:15px;
+}
+.player.show{
+    opacity:1;
+    transform: translateX(0);
+}
+
+.left{
+    display:flex;
+    gap:14px;
+    align-items:center;
+}
+.avatar{
+    width:46px;
+    height:46px;
+    border-radius:10px;
+    background:linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:15px;
+    color:#dffaff;
+    border:1px solid rgba(255,255,255,0.03);
+    box-shadow:0 0 6px rgba(0,255,255,0.12);
+}
+.meta{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    line-height:1.1;
+}
+.name{ font-weight:700; color:#ffffff; }
+.idjob{ font-size:12px; color:rgba(220,255,255,0.7); margin-top:3px; }
+.right{ text-align:right; min-width:96px; }
+
+.ping.good{ color:#7ef29b; font-weight:700; }
+.ping.ok{ color:#ffd36f; font-weight:700; }
+.ping.bad{ color:#ff6b6b; font-weight:700; }
+</style>
+</head>
+<body>
+<div id="board">
+    <div class="header">
+        <div class="logo"><i class="fa-solid fa-list"></i></div>
+        <div>
+            <div class="title">Scoreboard - Script By Yode</div>
+            <div class="sub">Premi F11 / ESC / BACKSPACE per chiudere</div>
+        </div>
+    </div>
+
+    <div class="stats">
+        <div class="stat">
+            <div>Giocatori Online</div>
+            <div class="num" id="count">0</div>
+        </div>
+        <div class="stat">
+            <div>Polizia Disponibile</div>
+            <div class="num" id="police">0</div>
+        </div>
+        <div class="stat">
+            <div>Medici Disponibili</div>
+            <div class="num" id="ems">0</div>
+        </div>
+    </div>
+
+    <div id="playerList"></div>
+</div>
+
+<script>
+const board=document.getElementById('board');
+const list=document.getElementById('playerList');
+
+function pingClass(p){const ping=Number(p)||0;if(ping<=90)return'ping good';if(ping<=180)return'ping ok';return'ping bad';}
+function avatarText(name){if(!name)return'PL';const t=String(name).trim();if(t.length===0)return'PL';return t.substring(0,2).toUpperCase();}
+
+// animate counters
+function animateNumber(element, value){
+    let current=Number(element.innerText)||0;
+    const diff=value-current;
+    const steps=20;
+    let step=0;
+    const interval=setInterval(()=>{
+        step++;
+        element.innerText=Math.floor(current+diff*step/steps);
+        if(step>=steps) clearInterval(interval);
+    },20);
+}
+
+window.addEventListener('message',(evt)=>{
+    const d=evt.data;
+    if(!d||!d.type)return;
+
+    if(d.type==='toggle'){
+        if(d.show) board.classList.add('show'); else board.classList.remove('show');
+    }
+
+    if(d.type==='update'){
+        animateNumber(document.getElementById('count'),(d.count!==undefined)?d.count:0);
+        animateNumber(document.getElementById('police'),(d.police!==undefined)?d.police:0);
+        animateNumber(document.getElementById('ems'),(d.ems!==undefined)?d.ems:0);
+
+        const players=Array.isArray(d.players)?d.players:[];
+        list.innerHTML='';
+        players.forEach((p,i)=>{
+            const name=p.name||('Player'+(p.id||''));
+            const avatar=avatarText(name);
+            const job=(p.job&&p.job!=='none')?p.job:'N/A';
+            const ping=(p.ping!==undefined)?p.ping:0;
+
+            const row=document.createElement('div');
+            row.className='player';
+            row.innerHTML=`
+                <div class="left">
+                    <div class="avatar">${avatar}</div>
+                    <div class="meta">
+                        <div class="name">ID ${p.id} - ${name}</div>
+                        <div class="idjob">${job}</div>
+                    </div>
+                </div>
+                <div class="right"><div class="${pingClass(ping)}">${ping} ms</div></div>
+            `;
+            list.appendChild(row);
+            // staggered animation
+            setTimeout(()=>{row.classList.add('show');}, i*70);
+        });
+    }
+});
+</script>
+</body>
+</html>
